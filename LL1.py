@@ -1,4 +1,5 @@
 """只能处理字母，认为一个字母是一个标识符  终结符必须是一个字母"""
+from prettytable import PrettyTable
 grammar=[]
 """  处理文法   """
 def del_leftrec(sentence:int):
@@ -145,6 +146,9 @@ def normalleft():
 """  求First和Follow   """
 extend_grammar = []
 extend_index = [] #记录对应的表达式的脚标
+first_index = []
+first = []
+follow = []
 def extend():
     if grammar[0].find("|"):
         sa = grammar[0].split("->")
@@ -167,9 +171,11 @@ def first_set():
     global grammar
     global extend_grammar
     notT = init_notT()
-    first = []
+    global first
+    global first_index
     for i in range(0,len(notT)):
         first.append([-1])
+        first_index.append([-1])
     row = []
     #print("len",len(first))
     first_end = [0]*len(extend_grammar)#判断扩展语句的每一条是否执行完
@@ -185,10 +191,12 @@ def first_set():
                 if first[extend_index[i]] == [-1]:
                     row.append(sa[1][0])  # 加入first
                     first[extend_index[i]] = row
+                    first_index[extend_index[i]] = [i]
                     row = []
                     first_end[i] = 1
                 else :
                     first[extend_index[i]].append(sa[1][0])
+                    first_index[extend_index[i]].append(i)
                     first_end[i] = 1
                 #print("t:",first)
                 #print("endt:", first_end)
@@ -198,10 +206,14 @@ def first_set():
                         row = first[index].copy()
                         first[extend_index[i]] = row
                         row = []
+                        row = [i]*len(first[index])
+                        first_index[extend_index[i]] = row
+                        row = []
                     else:
                         for k in range(0, len(first[index])):#不是第一次逐个比较加入
                             if first[extend_index[i]].count(first[index][k]) == 0:
                                 first[extend_index[i]].append(first[index][k])  # 把该非终结符的first并入
+                                first_index[extend_index[i]].append(i)
                     mark = index
                     length = len(notT[index])
                     end = ""
@@ -215,6 +227,7 @@ def first_set():
                             for k in range(0, len(first[mark])):
                                 if first[extend_index[i]].count(first[mark][k]) == 0:
                                     first[extend_index[i]].append(first[mark][k])
+                                    first_index[extend_index[i]].append(i)
                         length = length + len(notT[mark])
                     if end == "break":
                         first_end[extend_index[i]] = 0
@@ -225,10 +238,12 @@ def first_set():
                             for k in range(0, len(first[mark])):
                                 if first[extend_index[i]].count(first[mark][k]) == 0:
                                     first[extend_index[i]].append(first[mark][k])
+                                    first_index[extend_index[i]].append(i)
                             first_end[i] = 1
                     #print("FIRST:", first)
                     #print("endf:",first_end)
     print("first:",first)
+    print("first_index:",first_index)
     return first
 
 def find_notT(s,notT):
@@ -243,15 +258,16 @@ def find_notT(s,notT):
             return i
     return -1
 
-def follow_set(first):
+def follow_set():
     global grammar
     global extend_grammar
+    global follow
+    global first
     notT = init_notT()
     exp = []
     for i in range(0, len(extend_grammar)):
         sa = extend_grammar[i].split("->")
         exp.append(sa[1]) #所有表达式
-    follow = []
     for i in range(0,len(notT)):
         follow.append([-1])
     follow[0] =['$']  #对开始项加入$
@@ -322,26 +338,47 @@ def init_notT():
         notT.append(sa[0])  # 得到所有非终结符
     return notT
 
-def print_chart(first,follow,extend_grammar):
+def print_chart():
+    global first
+    global first_index
+    global follow
     T = []
     for i in range(0,len(first)):
         for j in range(0,len(first[i])):
-            if T.count(first[i][j]) == 0:
+            if T.count(first[i][j]) == 0 and first[i][j] != '%':
                 T.append(first[i][j])
     for i in range(0, len(follow)):
         for j in range(0, len(follow[i])):
-            if T.count(follow[i][j]) == 0:
+            if T.count(follow[i][j]) == 0 and follow[i][j] != '$':
                 T.append(follow[i][j])
+    T.append('$')
     notT = init_notT()
     res = []
     for i in range(0,len(notT)):
-        temp = [-1]*len(T)
+        temp = [" "]*len(T)
         res.append(temp)
-    print(res)
+
     for i in range(0,len(first)):
         for j in range(0,len(first[i])):
-            index = T.index(first[i][j])
-            res[i][index] =
+            if first[i][j] != '%':
+                index = T.index(first[i][j])
+                res[i][index] = first_index[i][j]
+            else :
+                for k in range(0,len(follow[i])):
+                    index = T.index(follow[i][k])
+                    res[i][index] = first_index[i][j]
+
+    print("Terminal:",T)
+    print("None Terminal:",notT)
+    resT = [" "] + T
+    x = PrettyTable(resT)
+    for i in range(0,len(res)):
+        temp = [notT[i]]+res[i]
+        x.add_row(temp)
+    print(x)
+
+
+
 
 
 
@@ -358,10 +395,10 @@ def main():
     extend()
     print("消除递归和因子：",grammar)
     print("扩展文法：",extend_grammar)
-    print(extend_index)
-    first = first_set()
-    follow = follow_set(first)
-    print_chart(first,follow,extend_grammar)
+    print("extend_index:",extend_index)
+    first_set()
+    follow_set()
+    print_chart()
 
 """
 exp->exp addop term|term
@@ -375,6 +412,7 @@ A->+|-
 T->TMF|F
 M->*
 F->(E)|N
+0
 """
 
 
