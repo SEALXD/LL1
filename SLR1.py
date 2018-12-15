@@ -1,6 +1,7 @@
 from prettytable import PrettyTable
 from Grammar import *
 import sys
+from LL1 import first_set,follow_set
 
 DFA = []
 DFA_end = []
@@ -30,6 +31,7 @@ def dot():
 def generate_node(str):
     #print("=====generate=====")
     global DFA
+    global trans
     node = [str]
     notT = init_notT()
     i = 0
@@ -46,6 +48,7 @@ def generate_node(str):
                 for j in range(1, len(dot_g[index])):
                     if node.count(dot_g[index][j]) == 0:
                         node.append(dot_g[index][j])
+
         i += 1
     node_end = [0]*len(node)
     DFA.append(node)
@@ -76,7 +79,6 @@ def add_gen(id,str):
                         node.append(dot_g[index][j])
                         DFA[id].append(dot_g[index][j])
                         DFA_end[id].append(0)
-
         i += 1
 
 
@@ -85,7 +87,7 @@ def move(s,mark,notT):
     # print(s)
     s = s.split("->")  #s = S~ ,·S
     index = s[1].find("·")
-    x = find_notT(s[1][index+1:],notT)
+    x = mark
     if index == 0 :
         if x == -1:
             if len(s[1][index+1:]) > 1:
@@ -150,17 +152,17 @@ def create_DFA():
                         spot = sent[1].find("·")
                         x = sent[1][spot + 1]  # 确定·后面的符号
 
-                    if trans[i].count(x) != 0:  # 检查trans中是否已经有这个转换
+                    if trans[i].count(x) != 0:  #检查trans中是否已经有这个转换
                         id = trans[i].index(x)
                         id = trans[i][id - 1]
-                        add_gen(id, str)  # 将对应的式子加入目标DFA
+                        add_gen(id,str) #将对应的式子加入目标DFA
                     else:
-                        res = check_node(str)  # trans中没有这个转换 检查是否有包含这个式子的结点
+                        res = check_node(str)  #trans中没有这个转换 检查是否有包含这个式子的结点
                         if res != -1:
                             trans[i].append(res)
                             trans[i].append(x)
                             DFA_end[i][j] = 1
-                        else:  # trans中没有这个转换  也没有包含这个式子的结点 生成新的结点
+                        else:       #trans中没有这个转换  也没有包含这个式子的结点 生成新的结点
                             generate_node(str)
                             trans[i].append(len(DFA) - 1)
                             trans[i].append(x)
@@ -170,7 +172,8 @@ def create_DFA():
                 # print(DFA_end)
         i += 1
 
-def chart():
+def chart(follow):
+    global trans
     notT = init_notT()
     T = []
     res = []
@@ -191,21 +194,18 @@ def chart():
             if DFA[i][j].endswith("·"):
                 flag = 1
                 break
-        if flag:
+        if flag :
             sa = DFA[i][j].split("->")
             if sa[1] == "·":
                 s = sa[0] + "->" + "%"
             else:
                 s = DFA[i][j][:len(DFA[i][j]) - 1]
             index = extend_grammar.index(s)
-            if index != 0 :
-                for j in range(0, len(T)):
-                    if res[i][j] == "":
-                        res[i][j] = "r" + str(index)
-                    else:
-                        print("conflict grammar")
-                        sys.exit()
-
+            id = notT.index(sa[0])
+            for j in range(0, len(follow[id])):
+                for k in range(0, len(T)):
+                    if T[k] == follow[id][j]:
+                        res[i][k] = "r" + str(index)
         if len(trans[i]) != 0:
             for j in range(0, len(trans[i]), 2):
                 index = row.index(trans[i][j + 1])
@@ -221,14 +221,17 @@ def chart():
                     else:
                         print("conflict grammar")
                         sys.exit()
-    res[1][len(T) - 1] = "acc"
+        #print(res[i])
+    res[1][len(T)-1] = "acc"
     reschart = [" "] + row
     x = PrettyTable(reschart)
     for i in range(0,len(res)):
         temp = [i] + res[i]
         x.add_row(temp)
     print(x)
-    return res
+    # for i in range(0,len(res)):
+    #     print(res[i])
+    return res,row
 
 def count(str):
     notT = init_notT()
@@ -244,7 +247,7 @@ def count(str):
     return num
 
 
-def check(s,res):
+def check(s,res,row):
     global extend_grammar
     stack_anyl = []
     stack_input = []
@@ -257,48 +260,44 @@ def check(s,res):
         stack_input.append(s[len(s) - i - 1])
     print(stack_anyl)
     print(stack_input)
-    error_flag = 0
-    flag = 1
+
     while 1 :
-        if res[point].count("acc") == 1:
-            index = 0
-            sa = extend_grammar[index].split("->")
-            l = count(sa[1])  # 得到撒sa1的长度
+        index = row.index(stack_input[-1])
+        if res[point][index] == "acc":
+            break
+        elif res[point][index] == "":
+            print("error")
+            sys.exit()
+        elif res[point][index].startswith("r"):
+            id = int(res[point][index][1:])
+            case = "reduce" + extend_grammar[id]
+            sa = extend_grammar[id].split("->")
+            if sa[1] == "%":
+                l = 0
+            else:
+                l = count(sa[1])  # 得到撒sa1的长度
             for i in range(0, l * 2):
                 stack_anyl.pop()
-            stack_anyl.append(notT[0])
-            break
+            point = int(stack_anyl[-1][1:])
+            index = row.index(sa[0])
+            stack_anyl.append(sa[0])
+            stack_anyl.append("s" + str(res[point][index]))
+            point = res[point][index]
+            print("point:", point)
+
+
         else:
-            if len(trans[point]) == 0 or trans[point].count(stack_input[-1]) == 0:
-                index = int(res[point][0][1:])
-                sa = extend_grammar[index].split("->")
-                l = count(sa[1])  # 得到撒sa1的长度
-                for i in range(0, l * 2):
-                    stack_anyl.pop()
-                point = int(stack_anyl[-1][1:])
-                index = trans[point].index(sa[0]) - 1
-                stack_anyl.append(sa[0])
-                stack_anyl.append("s" + str(trans[point][index]))
-                point = trans[point][index]
+            if res[point][index].startswith("s"):
+                case = "shift"
+                stack_anyl.append(stack_input[-1])
+                point = int(res[point][index][1:])
+                stack_anyl.append("s" + str(point))
+                stack_input.pop()
             else:
-                if trans[point].count(stack_input[-1]) != 0:
-                    stack_anyl.append(stack_input[-1])
-                    index = trans[point].index(stack_input[-1]) - 1
-                    point = trans[point][index]
-                    stack_anyl.append("s" + str(point))
-                    stack_input.pop()
-        error_flag += 1
-        print("分析：",stack_anyl,"输入：",stack_input)
-        if error_flag >len(s)*2+1 :
-            print("error")
-            flag = 0
-            break
-    if flag :
-        if len(stack_input) > 1:
-            print("error")
-        else:
-            print("final 分析：", stack_anyl, "输入：", stack_input)
-            print("accept")
+                print("error")
+                sys.exit()
+        print("分析：",stack_anyl,"输入：",stack_input,"动作：",case)
+    print("accept")
 
 
 
@@ -310,22 +309,22 @@ def main():
         grammar.append(wenfa)
         wenfa=input()
     print("所有文法：",grammar)
-    # normalleft()
-    # for i in range(0,len(grammar)):
-    #     del_leftfact(i)
     extend()
-    print("扩展文法：",extend_grammar)
+    print("拓展文法：",extend_grammar)
     print("extend_index:",extend_index)
     dot()
     create_DFA()
     print("DFA:")
     for i in range(0, len(DFA)):
-        print("结点内容：",DFA[i],"链接：",trans[i])
+        print("序号：",i,"结点内容：",DFA[i],"链接：",trans[i])
     print("================")
-    print("chart")
-    res = chart()
+    notT = init_notT()
+    print(notT)
+    first_set()
+    follow = follow_set()
+    res,row = chart(follow)
     s = input()
-    check(s,res)
+    check(s,res,row)
 
 
 
@@ -335,16 +334,15 @@ if __name__=='__main__':
 
 
 """
-S->aA
-A->cA|d
+
+E->E+T|T
+T->T*F|F
+F->(E)|i
 0
 
-
-S->A|B
-A->aAb|c
-B->aBd|d
+E->E+n|n
 0
 
-acb
-aaddd
+S->(S)S|%
+0
 """
