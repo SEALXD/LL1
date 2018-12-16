@@ -187,3 +187,169 @@ def find_notT(s,notT):
         if res == notT[i]:
             return i
     return -1
+
+
+first_index = []
+first = []
+follow = []
+
+def first_set():
+    global grammar
+    global extend_grammar
+    notT = init_notT()
+    global first
+    global first_index
+    for i in range(0,len(notT)):
+        first.append([-1])
+        first_index.append([-1])
+    first_end = [0]*len(extend_grammar)#判断扩展语句的每一条是否执行完
+    while first_end.count(1)!=len(first_end):
+        for i in range(0, len(extend_grammar)):
+            sa = extend_grammar[i].split("->")
+            index = first_isnT(sa[1], notT)  # 即首项是非终结符
+            if index == -1 and first_end[i]== 0:  # 若首项不是非终结符且此语句尚未执行
+                if first[extend_index[i]] == [-1]:
+                    first[extend_index[i]] = []
+                    first[extend_index[i]].append(sa[1][0])
+                    first_index[extend_index[i]] = [i]
+                    first_end[i] = 1
+                else :
+                    first[extend_index[i]].append(sa[1][0])
+                    first_index[extend_index[i]].append(i)
+                    first_end[i] = 1
+            elif index != -1 and first_end[i]== 0:  # 若首项是非终结符且此语句尚未执行
+                if first[index] != [-1]:  # 若当前第一项的first不为空
+                    #index  非终结符序号
+                    length = 0
+                    end = ""
+                    while 1:
+                        rest = sa[1][length:]
+                        index = first_isnT(rest, notT)  # 判断下一个非终结符
+                        length = length + len(notT[index])  # 更新length
+                        if first[index] == [-1]:  # 还没生成
+                            end = "break"
+                            break
+                        elif index == -1:  # 终结符,加入并跳出
+                            if first[extend_index[i]] == [-1]:  # 如果为第一次先清空
+                                first[extend_index[i]] = []
+                                first_index[extend_index[i]] = []
+                            first[extend_index[i]].append(rest[0])
+                            first_index[extend_index[i]].append(i)
+                            end = "terminal"
+                            break
+                        elif len(sa[1]) == length: # 判断到头了,但最后一个没执行
+                            end = "last"
+                            break
+                        elif first[index].count("%") == 0:
+                            end = "without"
+                            break
+                        else:
+                            if first[extend_index[i]] == [-1]:  # 如果为第一次先清空
+                                first[extend_index[i]] = []
+                                first_index[extend_index[i]] = []
+                            for k in range(0, len(first[index])):  # 加入不重复且不为空的
+                                if first[extend_index[i]].count(first[index][k]) == 0 and first[index][k] != "%":
+                                    first[extend_index[i]].append(first[index][k])  # 把该非终结符的first并入
+                                    first_index[extend_index[i]].append(i)
+
+                    if end == "break": #没生成跳出
+                        continue
+                    elif end == "terminal": #终结符跳出，该语句执行完
+                        first_end[i] = 1
+                    elif end == "without":
+                        if first[extend_index[i]] == [-1]:  # 如果为第一次先清空
+                            first[extend_index[i]] = []
+                            first_index[extend_index[i]] = []
+                        for k in range(0, len(first[index])):
+                            if first[extend_index[i]].count(first[index][k]) == 0:
+                                first[extend_index[i]].append(first[index][k])
+                                first_index[extend_index[i]].append(i)
+                        first_end[i] = 1
+                    elif end == "last": #全部判断完跳出，该语句执行完
+                        if first[extend_index[i]] == [-1]:  # 如果为第一次先清空
+                            first[extend_index[i]] = []
+                            first_index[extend_index[i]] = []
+                        for k in range(0, len(first[index])):
+                            if first[extend_index[i]].count(first[index][k]) == 0 and first[index][k] != "%":
+                                first[extend_index[i]].append(first[index][k])
+                                first_index[extend_index[i]].append(i)
+                        if first[index].count("%") != 0:
+                            first[extend_index[i]].append("%")
+                            first_index[extend_index[i]].append(i)
+                        first_end[i] = 1
+                else:  #当前第一项的first为空,跳过
+                    continue
+            # print("FIRST:", first)
+            # print("endf:", first_end)
+
+
+    print("first:", first)
+    print("first_index:",first_index)
+    return first
+
+
+def follow_set():
+    global grammar
+    global extend_grammar
+    global follow
+    global first
+    notT = init_notT()
+    exp = []
+    for i in range(0, len(extend_grammar)):
+        sa = extend_grammar[i].split("->")
+        exp.append(sa[1]) #所有表达式
+    for i in range(0,len(notT)):
+        follow.append([-1])
+    follow[0] =['$']  #对开始项加入$
+    flag = 1
+    while flag :
+        flag = 0
+        for i in range(0, len(notT)):
+            for j in range(0, len(exp)):
+                x = exp[j].find(notT[i])
+                if x != -1:  # 如果找到了非终结符
+                    if x + len(notT[i]) >= len(exp[j]):  # 结尾
+                        if follow[extend_index[j]] != [-1]:
+                            if follow[i] == [-1]:
+                                follow[i].clear()
+                            for k in range(0, len(follow[extend_index[j]])):  # 加入到当前终结符的follow
+                                if follow[i].count(follow[extend_index[j]][k]) == 0:
+                                    follow[i].append(follow[extend_index[j]][k])
+                                    flag = 1
+                                    """mark"""
+
+                    elif exp[j][x + len(notT[i])] != "'":  # 不是结尾 判断后面还有没有’
+                        s = exp[j][x + len(notT[i]):]
+                        index = find_notT(s, notT)  # 找该非终结符后面第一个是不是非终结符 若有 返回是第几个非终结符
+                        if index == -1:  # 若不是 加入
+                            if follow[i] == [-1]:
+                                follow[i] = [exp[j][x + len(notT[i])]]
+                            else:
+                                if follow[i].count(exp[j][x + len(notT[i])]) == 0:
+                                    follow[i].append(exp[j][x + len(notT[i])])
+                                    flag = 1
+                                    """mark"""
+                        else:  # 若是 把该非终结符的first加入
+                            if follow[i] == [-1]:
+                                follow[i].clear()
+                                for k in range(0, len(first[index])):
+                                    if first[index][k] != '%':
+                                        follow[i].append(first[index][k])
+                            elif follow[i] != [-1]:
+                                for k in range(0, len(first[index])):
+                                    if follow[i].count(first[index][k]) == 0 and first[index][k] != '%':  # 加入不为空的
+                                        follow[i].append(first[index][k])
+                            if first[index].count('%') != 0:
+                                mark = extend_index[j]
+                                if follow[mark] != [-1]:
+                                    for k in range(0, len(follow[mark])):
+                                        if follow[i].count(follow[mark][k]) == 0:
+                                            follow[i].append(follow[mark][k])
+                                            flag = 1
+                                            """mark"""
+                    else:
+                        continue
+                        # print("skip")
+                #print(follow)
+    print("follow:",follow)
+    return follow

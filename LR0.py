@@ -36,13 +36,9 @@ def generate_node(str):
     while i < len(node):
         g = node[i].split("->")
         temp = g[1].split("·")
-        if temp[1] == "": #如果·已经在最后
-            break
-        else :
+        if temp[1] != "": #如果·不在最后
             index = find_notT(temp[1], notT)
-            if index == -1:
-                break
-            else:
+            if index != -1:
                 for j in range(1, len(dot_g[index])):
                     if node.count(dot_g[index][j]) == 0:
                         node.append(dot_g[index][j])
@@ -64,19 +60,14 @@ def add_gen(id,str):
     while i < len(node):
         g = node[i].split("->")
         temp = g[1].split("·")
-        if temp[1] == "":  # 如果·已经在最后
-            break
-        else:
+        if temp[1] != "": #如果·不在最后
             index = find_notT(temp[1], notT)
-            if index == -1:
-                break
-            else:
+            if index != -1:
                 for j in range(1, len(dot_g[index])):
                     if DFA[id].count(dot_g[index][j]) == 0:
                         node.append(dot_g[index][j])
                         DFA[id].append(dot_g[index][j])
                         DFA_end[id].append(0)
-
         i += 1
 
 
@@ -153,7 +144,10 @@ def create_DFA():
                     if trans[i].count(x) != 0:  # 检查trans中是否已经有这个转换
                         id = trans[i].index(x)
                         id = trans[i][id - 1]
-                        add_gen(id, str)  # 将对应的式子加入目标DFA
+                        #add_gen(id, str)  # 将对应的式子加入目标DFA
+                        if DFA[id].count(str) == 0:
+                            add_gen(id, str)
+                        DFA_end[i][j] = 1
                     else:
                         res = check_node(str)  # trans中没有这个转换 检查是否有包含这个式子的结点
                         if res != -1:
